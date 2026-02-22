@@ -322,6 +322,7 @@ def evaluate_model(model, loader, device, cls_criterion, reg_criterion,
     correct = 0
     total = 0
     all_preds = []
+    all_probs = []
     all_labels = []
     all_mass_pred = []
     all_mass_true = []
@@ -344,10 +345,10 @@ def evaluate_model(model, loader, device, cls_criterion, reg_criterion,
             preds = cls_logits.argmax(dim=1)
             correct += (preds == cls_labels).sum().item()
             total += imgs.shape[0]
-
             mass_pred_real = mass_pred * mass_std + mass_mean
-
+            probs = torch.softmax(cls_logits, dim=1)
             all_preds.extend(preds.cpu().numpy().tolist())
+            all_probs.extend(probs.cpu().numpy().tolist())
             all_labels.extend(cls_labels.cpu().numpy().tolist())
             all_mass_pred.extend(mass_pred_real.cpu().numpy().flatten().tolist())
             all_mass_true.extend(mass_labels.cpu().numpy().flatten().tolist())
@@ -361,6 +362,7 @@ def evaluate_model(model, loader, device, cls_criterion, reg_criterion,
         "mae": float(np.mean(np.abs(all_mass_pred - all_mass_true))),
         "mse": float(np.mean((all_mass_pred - all_mass_true) ** 2)),
         "preds": all_preds,
+        "probs": all_probs,
         "labels": all_labels,
         "mass_pred": all_mass_pred.tolist(),
         "mass_true": all_mass_true.tolist(),

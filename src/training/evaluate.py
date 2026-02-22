@@ -204,6 +204,20 @@ def run_evaluation():
             f"reports/mass_scatter_{tag}.png"
         )
 
+        # ROC-AUC plot (binary classification)
+        if "labels" in results:
+            if "probs" in results:
+                probs_array = np.array(results["probs"])
+            else:
+                probs_array = np.array(results["preds"])
+            auc_val = plot_auc(
+                results["labels"], probs_array,
+                f"ROC Curve ({tag})",
+                f"reports/roc_auc_{tag}.png"
+            )
+            if auc_val is not None:
+                print(f"  {tag} AUC: {auc_val:.4f}")
+
     print("\nEvaluation complete. Reports saved to reports/")
 
 

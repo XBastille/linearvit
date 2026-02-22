@@ -303,6 +303,44 @@ class LinearViT(nn.Module):
         mass_pred = self.reg_head(features)
         return cls_logits, mass_pred
 
+    def forward_contrastive(self, x, proj_head):
+        """
+        Forward pass for contrastive pretraining (SimCLR).
+
+        Runs the backbone and returns L2-normalized projection head output.
+
+        Args:
+            x: (B, C, H, W) input images
+            proj_head: SimCLRProjectionHead module
+
+        Returns:
+            z: (B, proj_dim) L2-normalized projections
+        """
+        features = self.forward_features(x)  # (B, D)
+        z = proj_head(features)               # (B, proj_dim)
+        z = F.normalize(z, dim=-1)            
+        return z
+
+
+class SimCLRProjectionHead(nn.Module):
+    """
+    SimCLR projection head: 2-layer MLP that maps backbone features
+    to a lower-dimensional space for contrastive learning.
+    Used only during pretraining, discarded during finetuning.
+    """
+
+    def __init__(self, embed_dim=256, hidden_dim=256, proj_dim=128):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(embed_dim, hidden_dim),
+            nn.BatchNorm1d(hidden_dim),
+            nn.GELU(),
+            nn.Linear(hidden_dim, proj_dim),
+        )
+
+    def forward(self, x):
+        return self.net(x)
+
 
 class PretrainDecoder(nn.Module):
     """

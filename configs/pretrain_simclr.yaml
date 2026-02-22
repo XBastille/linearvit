@@ -1,0 +1,25 @@
+model:
+  in_channels: 8
+  img_size: 125
+  embed_dim: 256
+  depth: 6
+  num_heads: 4
+  patch_size: 5
+  mlp_ratio: 4.0
+  dropout: 0.1
+  drop_path_rate: 0.1
+  lcm_kernel: 7
+  projection_dim: 128
+
+data:
+  unlabelled_path: data/Dataset_Specific_Unlabelled.h5
+  batch_size: 128
+  num_workers: 4
+
+training:
+  epochs: 50
+  lr: 0.0003
+  weight_decay: 0.05
+  warmup_epochs: 5
+  temperature: 0.5
+  patience: 15
