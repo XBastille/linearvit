@@ -7,9 +7,9 @@
 
 ## Abstract
 
-We present a linear-scale attention Vision Transformer (L2ViT) for simultaneous binary classification and mass regression on multi-channel CMS calorimeter images. The model uses ReLU kernel-based attention with $O(Nd^2)$ complexity and a Local Concentration Module (LCM) for local spatial reasoning. We explore two self-supervised pretraining strategies on the 28 GB unlabelled CMS dataset: Masked Autoencoder (MAE) reconstruction and SimCLR contrastive learning with physics-aware augmentations. We find that MAE pretraining degrades downstream performance due to the extreme sparsity of the data (98.8% zeros) and the architectural incompatibility between masking and LCM. SimCLR contrastive pretraining with detector-symmetry-preserving augmentations consistently improves all metrics over training from scratch.
+This project presents a linear-scale attention Vision Transformer (L2ViT) for simultaneous binary classification and mass regression on multi-channel CMS calorimeter images. A ReLU kernel-based attention is used with $O(Nd^2)$ complexity and a Local Concentration Module (LCM) for local spatial reasoning. Two self-supervised pretraining strategies are explored on the 28 GB unlabelled CMS dataset: Masked Autoencoder (MAE) reconstruction and SimCLR contrastive learning with physics-aware augmentations. It is found that MAE pretraining degrades downstream performance due to the extreme sparsity of the data (98.8% zeros) and the architectural incompatibility between masking and LCM. SimCLR contrastive pretraining with detector-symmetry-preserving augmentations consistently improves all metrics over training from scratch.
 
-**Links:** [ML4SCI Project Page](https://ml4sci.org/gsoc/2026/proposal_E2E5.html) | [Model Weights (GitHub Release)](https://github.com/YOUR_USERNAME/YOUR_REPO/releases/tag/v1.0)
+**Links:** [ML4SCI Project Page](https://ml4sci.org/gsoc/2026/proposal_E2E5.html)
 
 ---
 
@@ -33,15 +33,16 @@ The model follows the L2ViT architecture (Zheng et al., 2025), replacing quadrat
 graph TD
     A["Input Image<br/>(8 x 125 x 125)"] --> B["Patch Embedding<br/>(5x5 patches → 625 tokens)"]
     B --> C["+ Positional Encoding"]
-    C --> D["Transformer Block x6"]
+    
+    C --> E
 
-    subgraph TB["Transformer Block"]
+    subgraph TB [Transformer Block x6]
         direction TB
         E["Linear Attention<br/>(ReLU kernel, O(Nd²))"] --> F["Local Concentration Module<br/>(7x7 Depthwise Conv)"]
         F --> G["Feed-Forward Network<br/>(MLP ratio = 4.0)"]
     end
 
-    D --> H["Layer Norm + Mean Pool"]
+    G --> H["Layer Norm + Mean Pool"]
     H --> I["Classification Head<br/>(2 classes)"]
     H --> J["Regression Head<br/>(mass prediction)"]
 ```
@@ -61,7 +62,7 @@ graph TD
 
 ### Linear Attention
 
-Standard softmax attention has $O(N^2 d)$ complexity. We use a ReLU kernel decomposition:
+Standard softmax attention has $O(N^2 d)$ complexity. A ReLU kernel decomposition is used:
 
 $$\text{Attn}(Q, K, V) = \frac{\phi(Q) \cdot (\phi(K)^T V)}{\phi(Q) \cdot (\phi(K)^T \mathbf{1})}$$
 
@@ -75,11 +76,11 @@ Linear attention loses local spatial detail relative to softmax attention. The L
 
 ## Self-Supervised Pretraining
 
-We pretrain the backbone on the unlabelled CMS dataset (~57,000 images, 28 GB) before finetuning on the 10,000-sample labelled dataset.
+The backbone is pretrained on the unlabelled CMS dataset (~57,000 images, 28 GB) before being finetuned on the 10,000-sample labelled dataset.
 
 ### Strategy Comparison
 
-We explored two pretraining strategies:
+Two pretraining strategies were explored:
 
 | | MAE (Masked Autoencoder) | SimCLR (Contrastive) |
 |---|---|---|
@@ -104,17 +105,17 @@ MAE pretraining failed for two reasons: (1) with 98.8% zero pixels, the reconstr
 
 ### Physics-Aware Augmentations
 
-The CMS detector images are in $(\eta, \phi)$ space. Our augmentations respect the physical symmetries of the cylindrical CMS detector and proton-proton collisions:
+The CMS detector images are in $(\eta, \phi)$ space. The augmentations chosen respect the physical symmetries of the cylindrical CMS detector and proton-proton collisions:
 
 | Augmentation | Implementation | Physics Justification |
-|---|---|---|
+|---|---|
 | $\phi$-flip | `img.flip(-1)` | Azimuthal symmetry of the cylindrical detector |
 | $\eta$-flip | `img.flip(-2)` | Forward-backward symmetry of pp collisions |
 | Cyclic $\phi$-roll | `torch.roll(img, shift, dims=-1)` | $\phi$ is periodic (detector wraps in azimuth) |
 | Channel dropout | Zero 1-2 of 8 channels | Partial detector readout robustness |
 | Active-cell noise | Gaussian noise on non-zero pixels only | Electronic readout noise in active calorimeter cells |
 
-We explicitly avoid augmentations that are inappropriate for calorimeter data: color jitter, random crops, Gaussian blur, and grayscale conversion.
+Augmentations that are inappropriate for calorimeter data (such as color jitter, random crops, Gaussian blur, and grayscale conversion) are explicitly avoided.
 
 ---
 
@@ -201,7 +202,7 @@ python -m src.training.evaluate
 
 ### Skip Training: Download Pre-trained Weights
 
-If you want to skip training and directly evaluate, download the model weights from the [GitHub Release](https://github.com/YOUR_USERNAME/YOUR_REPO/releases/tag/v1.0) and place them in the `weights/` directory:
+To skip training and directly evaluate, download the model weights from the GitHub Release and place them in the `weights/` directory:
 
 ```
 weights/
@@ -254,17 +255,17 @@ linearvit/
 
 The fundamental challenge with CMS calorimeter images is their extreme sparsity: 98.8% of pixels are zero. This has two consequences for pretraining strategy selection:
 
-1. **Reconstruction objectives are trivially satisfied.** An MAE decoder that outputs zeros everywhere achieves very low reconstruction loss. The resulting backbone features are optimized for background prediction, not for discriminating collision signatures.
+1.  **Reconstruction objectives are trivially satisfied.** An MAE decoder that outputs zeros everywhere achieves very low reconstruction loss. The resulting backbone features are optimized for background prediction, not for discriminating collision signatures.
 
-2. **Masking is architecturally incompatible with LCM.** The Local Concentration Module uses spatially-structured depthwise convolutions that require a complete spatial grid. Masked tokens break this grid, forcing `skip_lcm=True` during MAE pretraining. LCM weights remain randomly initialized, corrupting pretrained features during finetuning.
+2.  **Masking is architecturally incompatible with LCM.** The Local Concentration Module uses spatially-structured depthwise convolutions that require a complete spatial grid. Masked tokens break this grid, forcing `skip_lcm=True` during MAE pretraining. LCM weights remain randomly initialized, corrupting pretrained features during finetuning.
 
 SimCLR avoids both issues: its contrastive objective forces the encoder to learn instance-discriminative features (directly relevant to classification), and it processes all tokens through the full backbone (including LCM) at every step. The physics-aware augmentations ensure that the learned invariances respect the symmetries of the CMS detector.
 
 ### Relation to Prior Work
 
-Our approach is consistent with the JetCLR line of work (Dillon et al., 2022), which demonstrated that contrastive self-supervised learning with physics-motivated augmentations produces effective representations for jet classification. Like JetCLR, we use geometric transformations (rotations, translations) aligned with detector symmetries rather than natural-image augmentations.
+This approach is consistent with the JetCLR line of work (Dillon et al., 2022), which demonstrated that contrastive self-supervised learning with physics-motivated augmentations produces effective representations for jet classification. Like JetCLR, geometric transformations (rotations, translations) aligned with detector symmetries are used rather than natural-image augmentations.
 
-The cyclic $\phi$-roll augmentation is motivated by the cylindrical geometry of the CMS detector: the azimuthal angle $\phi$ is periodic, making cyclic translation a genuine physical symmetry. We avoid 90-degree rotations, which would swap the $\eta$ and $\phi$ axes (quantities with distinct physical meanings).
+The cyclic $\phi$-roll augmentation is motivated by the cylindrical geometry of the CMS detector: the azimuthal angle $\phi$ is periodic, making cyclic translation a genuine physical symmetry. 90-degree rotations are avoided, which would swap the $\eta$ and $\phi$ axes (quantities with distinct physical meanings).
 
 ---
 
@@ -303,8 +304,3 @@ The cyclic $\phi$-roll augmentation is motivated by the cylindrical geometry of 
 }
 ```
 
----
-
-## License
-
-This project is developed as part of the ML4SCI GSoC 2026 evaluation test.
