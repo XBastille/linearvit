@@ -108,7 +108,7 @@ MAE pretraining failed for two reasons: (1) with 98.8% zero pixels, the reconstr
 The CMS detector images are in $(\eta, \phi)$ space. The augmentations chosen respect the physical symmetries of the cylindrical CMS detector and proton-proton collisions:
 
 | Augmentation | Implementation | Physics Justification |
-|---|---|
+|---|---|---|
 | $\phi$-flip | `img.flip(-1)` | Azimuthal symmetry of the cylindrical detector |
 | $\eta$-flip | `img.flip(-2)` | Forward-backward symmetry of pp collisions |
 | Cyclic $\phi$-roll | `torch.roll(img, shift, dims=-1)` | $\phi$ is periodic (detector wraps in azimuth) |
