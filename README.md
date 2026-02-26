@@ -86,7 +86,7 @@ Two pretraining strategies were explored:
 |---|---|---|
 | Objective | Reconstruct masked patches | Distinguish different collision events |
 | LCM during pretraining | Skipped (masked tokens break spatial grid) | Fully active |
-| Downstream Accuracy | 86.05% (worse than scratch) | **90.60%** (better than scratch) |
+| Downstream Accuracy | 86.05% (worse than scratch) | **90.30%** (better than scratch) |
 | Conclusion | Ineffective on sparse data | Effective |
 
 MAE pretraining failed for two reasons: (1) with 98.8% zero pixels, the reconstruction loss is dominated by trivially predicting background, and (2) masking requires `skip_lcm=True`, leaving LCM weights randomly initialized during finetuning.
@@ -138,15 +138,14 @@ Both models share the identical architecture and are evaluated on the same deter
 
 | Metric | Pretrained (SimCLR) | Scratch | Improvement |
 |---|---|---|---|
-| **Test Accuracy** | **90.60%** | 89.10% | +1.50% |
-| **ROC-AUC** | **0.9656** | 0.9578 | +0.78% |
-| **Mass MAE (GeV)** | **15.83** | 17.20 | -8.0% |
-| **Mass MSE** | **489.7** | 549.6 | -10.9% |
-| **Test Loss** | **0.318** | 0.372 | -14.6% |
+| **Test Accuracy** | **90.30%** | 89.50% | +0.80% |
+| **ROC-AUC** | **0.9649** | 0.9611 | +0.38% |
+| **Mass MAE (GeV)** | **16.39** | 17.36 | -5.6% |
+| **Mass MSE** | **508.9** | 549.4 | -7.4% |
+| **Test Loss** | **0.326** | 0.359 | -9.2% |
 
 The pretrained model outperforms scratch across all five metrics, demonstrating that self-supervised pretraining on the unlabelled data produces transferable representations for both classification and mass regression.
 
-> **Note:** These are preliminary results. After applying physics-aware augmentation refinements (cyclic $\phi$-roll replacing 90-degree rotation) and an attention stability fix (`denom` floor 1e-6), results may change upon retraining.
 
 ### Evaluation Plots
 
