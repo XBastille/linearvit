@@ -13,8 +13,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", ".."))
 from src.models.linear_vit import LinearViT
 from src.data.dataset import CMSLabelledDataset, create_splits, inspect_h5
 from src.training.utils import (
-    CosineWarmupScheduler, EarlyStopping, AverageMeter,
-    load_config, save_checkpoint, count_parameters
+    CosineWarmupScheduler,
+    EarlyStopping,
+    AverageMeter,
+    load_config,
+    save_checkpoint,
+    count_parameters,
 )
 
 
@@ -29,30 +33,38 @@ def finetune(config):
     print("--- Dataset inspection ---", flush=True)
     inspect_h5(cfg_data["labelled_path"])
 
-    splits = create_splits(
-        cfg_data["labelled_path"],
-        seed=cfg_data.get("seed", 42)
-    )
+    splits = create_splits(cfg_data["labelled_path"], seed=cfg_data.get("seed", 42))
 
     augment = cfg_data.get("augment", False)
-    train_ds = CMSLabelledDataset(cfg_data["labelled_path"], splits["train"], augment=augment)
+    train_ds = CMSLabelledDataset(
+        cfg_data["labelled_path"], splits["train"], augment=augment
+    )
     val_ds = CMSLabelledDataset(cfg_data["labelled_path"], splits["val"], augment=False)
-    test_ds = CMSLabelledDataset(cfg_data["labelled_path"], splits["test"], augment=False)
+    test_ds = CMSLabelledDataset(
+        cfg_data["labelled_path"], splits["test"], augment=False
+    )
 
     train_loader = DataLoader(
-        train_ds, batch_size=cfg_data["batch_size"],
-        shuffle=True, num_workers=cfg_data.get("num_workers", 4),
-        pin_memory=True, drop_last=True
+        train_ds,
+        batch_size=cfg_data["batch_size"],
+        shuffle=True,
+        num_workers=cfg_data.get("num_workers", 4),
+        pin_memory=True,
+        drop_last=True,
     )
     val_loader = DataLoader(
-        val_ds, batch_size=cfg_data["batch_size"],
-        shuffle=False, num_workers=cfg_data.get("num_workers", 4),
-        pin_memory=True
+        val_ds,
+        batch_size=cfg_data["batch_size"],
+        shuffle=False,
+        num_workers=cfg_data.get("num_workers", 4),
+        pin_memory=True,
     )
     test_loader = DataLoader(
-        test_ds, batch_size=cfg_data["batch_size"],
-        shuffle=False, num_workers=cfg_data.get("num_workers", 4),
-        pin_memory=True
+        test_ds,
+        batch_size=cfg_data["batch_size"],
+        shuffle=False,
+        num_workers=cfg_data.get("num_workers", 4),
+        pin_memory=True,
     )
 
     img, cls_label, mass_label = train_ds[0]
@@ -114,15 +126,18 @@ def finetune(config):
     backbone_lr = cfg_train.get("backbone_lr", cfg_train.get("lr", 1e-4))
     head_lr = cfg_train.get("head_lr", cfg_train.get("lr", 1e-4))
 
-    optimizer = torch.optim.AdamW([
-        {"params": backbone_params, "lr": backbone_lr},
-        {"params": head_params, "lr": head_lr},
-    ], weight_decay=cfg_train.get("weight_decay", 0.01))
+    optimizer = torch.optim.AdamW(
+        [
+            {"params": backbone_params, "lr": backbone_lr},
+            {"params": head_params, "lr": head_lr},
+        ],
+        weight_decay=cfg_train.get("weight_decay", 0.01),
+    )
 
     scheduler = CosineWarmupScheduler(
         optimizer,
         warmup_epochs=cfg_train.get("warmup_epochs", 3),
-        total_epochs=cfg_train["epochs"]
+        total_epochs=cfg_train["epochs"],
     )
 
     cls_criterion = nn.CrossEntropyLoss()
@@ -138,8 +153,14 @@ def finetune(config):
     start_epoch = 0
     best_val_loss = float("inf")
 
-    history = {"train_loss": [], "val_loss": [], "train_acc": [], "val_acc": [],
-               "train_mae": [], "val_mae": []}
+    history = {
+        "train_loss": [],
+        "val_loss": [],
+        "train_acc": [],
+        "val_acc": [],
+        "train_mae": [],
+        "val_mae": [],
+    }
 
     if os.path.exists(LATEST_PATH):
         print(f"Resuming from {LATEST_PATH}...", flush=True)
@@ -153,21 +174,34 @@ def finetune(config):
         early_stopping.counter = ckpt.get("es_counter", 0)
         for _ in range(start_epoch):
             scheduler.step()
-        print(f"Resumed at epoch {start_epoch + 1}, best_val_loss={best_val_loss:.6f}", flush=True)
+        print(
+            f"Resumed at epoch {start_epoch + 1}, best_val_loss={best_val_loss:.6f}",
+            flush=True,
+        )
     else:
         if is_pretrained:
             ckpt = torch.load(pretrained_path, map_location=device, weights_only=False)
             encoder_sd = ckpt.get("encoder_state_dict", ckpt)
             model_sd = model.state_dict()
-            filtered = {k: v for k, v in encoder_sd.items() if k in model_sd and v.shape == model_sd[k].shape}
+            filtered = {
+                k: v
+                for k, v in encoder_sd.items()
+                if k in model_sd and v.shape == model_sd[k].shape
+            }
             model_sd.update(filtered)
             model.load_state_dict(model_sd)
-            print(f"Loaded pretrained weights from {pretrained_path} ({len(filtered)}/{len(model_sd)} keys)", flush=True)
+            print(
+                f"Loaded pretrained weights from {pretrained_path} ({len(filtered)}/{len(model_sd)} keys)",
+                flush=True,
+            )
         else:
             print("Training from scratch (no pretrained weights)", flush=True)
 
     print(f"Model params: {count_parameters(model):,}", flush=True)
-    print(f"Mode: {tag} | backbone_lr={backbone_lr:.2e}, head_lr={head_lr:.2e}", flush=True)
+    print(
+        f"Mode: {tag} | backbone_lr={backbone_lr:.2e}, head_lr={head_lr:.2e}",
+        flush=True,
+    )
 
     for epoch in range(start_epoch, epochs):
         model.train()
@@ -178,8 +212,12 @@ def finetune(config):
         total = 0
         mae_meter = AverageMeter()
 
-        pbar = tqdm(train_loader, desc=f"Epoch {epoch+1}/{epochs} [train]",
-                    leave=False, dynamic_ncols=True)
+        pbar = tqdm(
+            train_loader,
+            desc=f"Epoch {epoch + 1}/{epochs} [train]",
+            leave=False,
+            dynamic_ncols=True,
+        )
         for imgs, cls_labels, mass_labels in pbar:
             imgs = imgs.to(device)
             cls_labels = cls_labels.to(device)
@@ -206,9 +244,10 @@ def finetune(config):
             correct += (preds == cls_labels).sum().item()
             total += imgs.shape[0]
             mae_meter.update(
-                ((mass_pred * mass_std + mass_mean) - mass_labels).abs().mean().item(), imgs.shape[0]
+                ((mass_pred * mass_std + mass_mean) - mass_labels).abs().mean().item(),
+                imgs.shape[0],
             )
-            pbar.set_postfix(loss=f"{loss_meter.avg:.4f}", acc=f"{correct/total:.4f}")
+            pbar.set_postfix(loss=f"{loss_meter.avg:.4f}", acc=f"{correct / total:.4f}")
 
         scheduler.step()
         train_acc = correct / total
@@ -221,9 +260,12 @@ def finetune(config):
         val_mae_meter = AverageMeter()
 
         with torch.no_grad():
-            for imgs, cls_labels, mass_labels in tqdm(val_loader,
-                    desc=f"Epoch {epoch+1}/{epochs} [val]",
-                    leave=False, dynamic_ncols=True):
+            for imgs, cls_labels, mass_labels in tqdm(
+                val_loader,
+                desc=f"Epoch {epoch + 1}/{epochs} [val]",
+                leave=False,
+                dynamic_ncols=True,
+            ):
                 imgs = imgs.to(device)
                 cls_labels = cls_labels.to(device)
                 mass_labels = mass_labels.to(device).unsqueeze(1)
@@ -241,7 +283,11 @@ def finetune(config):
                 val_correct += (preds == cls_labels).sum().item()
                 val_total += imgs.shape[0]
                 val_mae_meter.update(
-                    ((mass_pred * mass_std + mass_mean) - mass_labels).abs().mean().item(), imgs.shape[0]
+                    ((mass_pred * mass_std + mass_mean) - mass_labels)
+                    .abs()
+                    .mean()
+                    .item(),
+                    imgs.shape[0],
                 )
 
         val_acc = val_correct / max(val_total, 1)
@@ -255,57 +301,80 @@ def finetune(config):
         history["val_mae"].append(val_mae)
 
         lr = optimizer.param_groups[0]["lr"]
-        print(f"Epoch [{epoch+1}/{epochs}] "
-              f"loss={loss_meter.avg:.4f}(cls={cls_loss_meter.avg:.4f},reg={reg_loss_meter.avg:.4f}) "
-              f"acc={train_acc:.4f} mae={train_mae:.4f} | "
-              f"val_loss={val_loss_meter.avg:.4f} val_acc={val_acc:.4f} val_mae={val_mae:.4f} "
-              f"lr={lr:.2e}", flush=True)
+        print(
+            f"Epoch [{epoch + 1}/{epochs}] "
+            f"loss={loss_meter.avg:.4f}(cls={cls_loss_meter.avg:.4f},reg={reg_loss_meter.avg:.4f}) "
+            f"acc={train_acc:.4f} mae={train_mae:.4f} | "
+            f"val_loss={val_loss_meter.avg:.4f} val_acc={val_acc:.4f} val_mae={val_mae:.4f} "
+            f"lr={lr:.2e}",
+            flush=True,
+        )
 
         improved = early_stopping.step(val_loss_meter.avg)
         if val_loss_meter.avg < best_val_loss:
             best_val_loss = val_loss_meter.avg
         if improved:
-            save_checkpoint({
+            save_checkpoint(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.state_dict(),
+                    "val_loss": val_loss_meter.avg,
+                    "val_acc": val_acc,
+                    "val_mae": val_mae,
+                    "config": config,
+                    "history": history,
+                    "num_classes": num_classes,
+                    "mass_mean": mass_mean,
+                    "mass_std": mass_std,
+                },
+                BEST_PATH,
+            )
+
+        save_checkpoint(
+            {
                 "epoch": epoch,
                 "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+                "best_val_loss": best_val_loss,
                 "val_loss": val_loss_meter.avg,
-                "val_acc": val_acc,
-                "val_mae": val_mae,
-                "config": config,
+                "es_best": early_stopping.best,
+                "es_counter": early_stopping.counter,
                 "history": history,
+                "config": config,
                 "num_classes": num_classes,
                 "mass_mean": mass_mean,
                 "mass_std": mass_std,
-            }, BEST_PATH)
-
-        save_checkpoint({
-            "epoch": epoch,
-            "model_state_dict": model.state_dict(),
-            "optimizer_state_dict": optimizer.state_dict(),
-            "best_val_loss": best_val_loss,
-            "val_loss": val_loss_meter.avg,
-            "es_best": early_stopping.best,
-            "es_counter": early_stopping.counter,
-            "history": history,
-            "config": config,
-            "num_classes": num_classes,
-            "mass_mean": mass_mean,
-            "mass_std": mass_std,
-        }, LATEST_PATH)
+            },
+            LATEST_PATH,
+        )
 
         if early_stopping.should_stop:
-            print(f"Early stopping at epoch {epoch+1} (patience={patience})", flush=True)
+            print(
+                f"Early stopping at epoch {epoch + 1} (patience={patience})", flush=True
+            )
             break
 
     print("\n--- Test Set Evaluation ---", flush=True)
     ckpt = torch.load(BEST_PATH, map_location=device, weights_only=False)
     model.load_state_dict(ckpt["model_state_dict"])
-    test_results = evaluate_model(model, test_loader, device, cls_criterion, reg_criterion,
-                                  lambda_cls, lambda_reg, mass_mean, mass_std)
-    print(f"[{tag.upper()}] Test Acc: {test_results['accuracy']:.4f} | "
-          f"Test MAE: {test_results['mae']:.4f} | "
-          f"Test MSE: {test_results['mse']:.4f} | "
-          f"Test Loss: {test_results['loss']:.4f}", flush=True)
+    test_results = evaluate_model(
+        model,
+        test_loader,
+        device,
+        cls_criterion,
+        reg_criterion,
+        lambda_cls,
+        lambda_reg,
+        mass_mean,
+        mass_std,
+    )
+    print(
+        f"[{tag.upper()}] Test Acc: {test_results['accuracy']:.4f} | "
+        f"Test MAE: {test_results['mae']:.4f} | "
+        f"Test MSE: {test_results['mse']:.4f} | "
+        f"Test Loss: {test_results['loss']:.4f}",
+        flush=True,
+    )
 
     ckpt["test_results"] = test_results
     ckpt["history"] = history
@@ -314,8 +383,17 @@ def finetune(config):
     return test_results, history
 
 
-def evaluate_model(model, loader, device, cls_criterion, reg_criterion,
-                   lambda_cls=1.0, lambda_reg=1.0, mass_mean=0.0, mass_std=1.0):
+def evaluate_model(
+    model,
+    loader,
+    device,
+    cls_criterion,
+    reg_criterion,
+    lambda_cls=1.0,
+    lambda_reg=1.0,
+    mass_mean=0.0,
+    mass_std=1.0,
+):
     """Evaluate model on a dataloader. Denormalizes mass predictions."""
     model.eval()
     loss_meter = AverageMeter()
@@ -328,8 +406,9 @@ def evaluate_model(model, loader, device, cls_criterion, reg_criterion,
     all_mass_true = []
 
     with torch.no_grad():
-        for imgs, cls_labels, mass_labels in tqdm(loader, desc="Evaluating",
-                                                   leave=False, dynamic_ncols=True):
+        for imgs, cls_labels, mass_labels in tqdm(
+            loader, desc="Evaluating", leave=False, dynamic_ncols=True
+        ):
             imgs = imgs.to(device)
             cls_labels = cls_labels.to(device)
             mass_labels = mass_labels.to(device).unsqueeze(1)

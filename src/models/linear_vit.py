@@ -17,8 +17,7 @@ class LinearAttention(nn.Module):
         super().__init__()
         self.num_heads = num_heads
         self.head_dim = dim // num_heads
-        self.scale = self.head_dim ** -0.5
-
+        self.scale = self.head_dim**-0.5
         self.temperature = nn.Parameter(torch.ones(num_heads, 1, 1) * self.scale)
         self.qkv = nn.Linear(dim, dim * 3, bias=qkv_bias)
         self.proj = nn.Linear(dim, dim)
@@ -38,14 +37,17 @@ class LinearAttention(nn.Module):
         # denom = Q @ (K^T @ 1) -- normalization
         denom = torch.clamp(
             torch.einsum("bhnd,bhnd->bhn", q, k.sum(dim=2, keepdim=True).expand_as(q)),
-            min=1e2
+            min=1e2,
         ).unsqueeze(-1)
         # attn_out = Q @ (K^T @ V) * temperature / denom
         kv = torch.einsum("bhnd,bhne->bhde", k, v)  # (B, h, d, d)
-        kv = kv * self.temperature.unsqueeze(0)  # (1, h, 1, 1) broadcast with (B, h, d, d)
-        out = torch.einsum("bhnd,bhde->bhne", q, kv) # (B, h, N, d)
-        out = out / denom
 
+        kv = kv * self.temperature.unsqueeze(
+            0
+        )  # (1, h, 1, 1) broadcast with (B, h, d, d)
+
+        out = torch.einsum("bhnd,bhde->bhne", q, kv)  # (B, h, N, d)
+        out = out / denom
         out = out.transpose(1, 2).reshape(B, N, C)
         out = self.proj(out)
         out = self.proj_drop(out)
@@ -61,10 +63,17 @@ class LocalConcentrationModule(nn.Module):
     def __init__(self, dim, kernel_size=7):
         super().__init__()
         padding = kernel_size // 2
-        self.conv1 = nn.Conv2d(dim, dim, kernel_size=kernel_size, padding=padding, groups=dim)
+
+        self.conv1 = nn.Conv2d(
+            dim, dim, kernel_size=kernel_size, padding=padding, groups=dim
+        )
+
         self.act = nn.GELU()
         self.bn = nn.BatchNorm2d(dim)
-        self.conv2 = nn.Conv2d(dim, dim, kernel_size=kernel_size, padding=padding, groups=dim)
+
+        self.conv2 = nn.Conv2d(
+            dim, dim, kernel_size=kernel_size, padding=padding, groups=dim
+        )
 
     def forward(self, x, H, W):
         B, N, C = x.shape
@@ -107,8 +116,9 @@ class LinearViTBlock(nn.Module):
         -> LayerNorm -> MLP -> residual
     """
 
-    def __init__(self, dim, num_heads=4, mlp_ratio=4.0, drop=0.0,
-                 drop_path=0.0, lcm_kernel=7):
+    def __init__(
+        self, dim, num_heads=4, mlp_ratio=4.0, drop=0.0, drop_path=0.0, lcm_kernel=7
+    ):
         super().__init__()
         self.norm1 = nn.LayerNorm(dim)
         self.attn = LinearAttention(dim, num_heads=num_heads, proj_drop=drop)
@@ -139,6 +149,7 @@ class DropPath(nn.Module):
     def forward(self, x):
         if not self.training or self.drop_prob == 0.0:
             return x
+
         keep = 1 - self.drop_prob
         shape = (x.shape[0],) + (1,) * (x.ndim - 1)
         mask = torch.bernoulli(torch.full(shape, keep, device=x.device, dtype=x.dtype))
@@ -151,13 +162,16 @@ class PatchEmbedding(nn.Module):
     def __init__(self, in_channels=3, embed_dim=256, patch_size=8):
         super().__init__()
         self.patch_size = patch_size
-        self.proj = nn.Conv2d(in_channels, embed_dim,
-                              kernel_size=patch_size, stride=patch_size)
+
+        self.proj = nn.Conv2d(
+            in_channels, embed_dim, kernel_size=patch_size, stride=patch_size
+        )
+
         self.norm = nn.LayerNorm(embed_dim)
 
     def forward(self, x):
         # x: (B, C, H, W)
-        x = self.proj(x)          # (B, D, H/P, W/P)
+        x = self.proj(x)  # (B, D, H/P, W/P)
         H, W = x.shape[2], x.shape[3]
         x = x.flatten(2).transpose(1, 2)  # (B, N, D)
         x = self.norm(x)
@@ -174,10 +188,20 @@ class LinearViT(nn.Module):
       -> LayerNorm -> GlobalAvgPool -> cls_head, reg_head
     """
 
-    def __init__(self, in_channels=3, img_size=125, patch_size=8,
-                 embed_dim=256, depth=6, num_heads=4, mlp_ratio=4.0,
-                 num_classes=2, drop_rate=0.1, drop_path_rate=0.1,
-                 lcm_kernel=7):
+    def __init__(
+        self,
+        in_channels=3,
+        img_size=125,
+        patch_size=8,
+        embed_dim=256,
+        depth=6,
+        num_heads=4,
+        mlp_ratio=4.0,
+        num_classes=2,
+        drop_rate=0.1,
+        drop_path_rate=0.1,
+        lcm_kernel=7,
+    ):
         super().__init__()
         self.embed_dim = embed_dim
         self.num_classes = num_classes
@@ -187,17 +211,23 @@ class LinearViT(nn.Module):
         self.pos_drop = nn.Dropout(drop_rate)
         dpr = [x.item() for x in torch.linspace(0, drop_path_rate, depth)]
 
-        self.blocks = nn.ModuleList([
-            LinearViTBlock(
-                dim=embed_dim, num_heads=num_heads, mlp_ratio=mlp_ratio,
-                drop=drop_rate, drop_path=dpr[i], lcm_kernel=lcm_kernel
-            ) for i in range(depth)
-        ])
+        self.blocks = nn.ModuleList(
+            [
+                LinearViTBlock(
+                    dim=embed_dim,
+                    num_heads=num_heads,
+                    mlp_ratio=mlp_ratio,
+                    drop=drop_rate,
+                    drop_path=dpr[i],
+                    lcm_kernel=lcm_kernel,
+                )
+                for i in range(depth)
+            ]
+        )
 
         self.norm = nn.LayerNorm(embed_dim)
         self.cls_head = nn.Linear(embed_dim, num_classes)
         self.reg_head = nn.Linear(embed_dim, 1)
-
         self._init_weights()
 
     def _init_weights(self):
@@ -205,13 +235,17 @@ class LinearViT(nn.Module):
         self.apply(self._init_module)
 
     def _init_module(self, m):
+
         if isinstance(m, nn.Linear):
             nn.init.trunc_normal_(m.weight, std=0.02)
+
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
+
         elif isinstance(m, nn.LayerNorm):
             nn.init.ones_(m.weight)
             nn.init.zeros_(m.bias)
+
         elif isinstance(m, nn.Conv2d):
             nn.init.trunc_normal_(m.weight, std=0.02)
             if m.bias is not None:
@@ -265,16 +299,19 @@ class LinearViT(nn.Module):
         B, N, D = tokens.shape
         if N != self.pos_embed.shape[1]:
             pos = self._interpolate_pos(N, H, W)
+
         else:
             pos = self.pos_embed
+
         tokens = tokens + pos
         N_vis = int(N * (1 - mask_ratio))
         noise = torch.rand(B, N, device=tokens.device)
         ids_shuffle = torch.argsort(noise, dim=1)
         ids_restore = torch.argsort(ids_shuffle, dim=1)
         ids_keep = ids_shuffle[:, :N_vis]  # (B, N_vis)
-        visible_tokens = torch.gather(tokens, dim=1,
-                                       index=ids_keep.unsqueeze(-1).expand(-1, -1, D))  # (B, N_vis, D)
+        visible_tokens = torch.gather(
+            tokens, dim=1, index=ids_keep.unsqueeze(-1).expand(-1, -1, D)
+        )  # (B, N_vis, D)
 
         # Create mask: True = masked, False = visible
         mask = torch.ones(B, N, device=tokens.device, dtype=torch.bool)
@@ -317,8 +354,8 @@ class LinearViT(nn.Module):
             z: (B, proj_dim) L2-normalized projections
         """
         features = self.forward_features(x)  # (B, D)
-        z = proj_head(features)               # (B, proj_dim)
-        z = F.normalize(z, dim=-1)            
+        z = proj_head(features)  # (B, proj_dim)
+        z = F.normalize(z, dim=-1)
         return z
 
 
@@ -348,9 +385,16 @@ class PretrainDecoder(nn.Module):
     Takes visible tokens + mask info, reconstructs full image.
     """
 
-    def __init__(self, embed_dim=256, decoder_embed_dim=128,
-                 decoder_depth=2, decoder_num_heads=4,
-                 patch_size=8, in_channels=3, num_patches=625):
+    def __init__(
+        self,
+        embed_dim=256,
+        decoder_embed_dim=128,
+        decoder_depth=2,
+        decoder_num_heads=4,
+        patch_size=8,
+        in_channels=3,
+        num_patches=625,
+    ):
         super().__init__()
         self.patch_size = patch_size
         self.in_channels = in_channels
@@ -359,21 +403,28 @@ class PretrainDecoder(nn.Module):
         self.decoder_embed = nn.Linear(embed_dim, decoder_embed_dim)
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
         nn.init.normal_(self.mask_token, std=0.02)
+
         self.decoder_pos_embed = nn.Parameter(
-            torch.zeros(1, num_patches, decoder_embed_dim))
+            torch.zeros(1, num_patches, decoder_embed_dim)
+        )
+
         nn.init.trunc_normal_(self.decoder_pos_embed, std=0.02)
 
-        self.decoder_blocks = nn.ModuleList([
-            nn.TransformerEncoderLayer(
-                d_model=decoder_embed_dim,
-                nhead=decoder_num_heads,
-                dim_feedforward=decoder_embed_dim * 4,
-                dropout=0.0,
-                activation="gelu",
-                batch_first=True,
-                norm_first=True,
-            ) for _ in range(decoder_depth)
-        ])
+        self.decoder_blocks = nn.ModuleList(
+
+            [
+                nn.TransformerEncoderLayer(
+                    d_model=decoder_embed_dim,
+                    nhead=decoder_num_heads,
+                    dim_feedforward=decoder_embed_dim * 4,
+                    dropout=0.0,
+                    activation="gelu",
+                    batch_first=True,
+                    norm_first=True,
+                )
+                for _ in range(decoder_depth)
+            ]
+        )
 
         self.decoder_norm = nn.LayerNorm(decoder_embed_dim)
         self.decoder_pred = nn.Linear(decoder_embed_dim, pixel_dim)
@@ -397,23 +448,30 @@ class PretrainDecoder(nn.Module):
         x_full = torch.cat([x, mask_tokens], dim=1)  # (B, N, D_dec)
 
         x_full = torch.gather(
-            x_full, dim=1,
-            index=ids_restore.unsqueeze(-1).expand(-1, -1, x_full.shape[2])
+            x_full,
+            dim=1,
+            index=ids_restore.unsqueeze(-1).expand(-1, -1, x_full.shape[2]),
         )  # (B, N, D_dec)
 
         if N != self.decoder_pos_embed.shape[1]:
             old_size = int(math.sqrt(self.decoder_pos_embed.shape[1]))
-            pos = self.decoder_pos_embed.reshape(1, old_size, old_size, -1).permute(0, 3, 1, 2)
+
+            pos = self.decoder_pos_embed.reshape(1, old_size, old_size, -1).permute(
+                0, 3, 1, 2
+            )
+
             pos = F.interpolate(pos, size=(H, W), mode="bilinear", align_corners=False)
             pos = pos.permute(0, 2, 3, 1).reshape(1, H * W, -1)
 
         else:
             pos = self.decoder_pos_embed
+
         x_full = x_full + pos
 
         # Decode
         for blk in self.decoder_blocks:
             x_full = blk(x_full)
+
         x_full = self.decoder_norm(x_full)
 
         # Predict pixels
@@ -423,5 +481,5 @@ class PretrainDecoder(nn.Module):
         x_full = x_full.reshape(B, H, W, P, P, C)
         x_full = x_full.permute(0, 5, 1, 3, 2, 4)  # (B, C, H, P, W, P)
         x_full = x_full.reshape(B, C, H * P, W * P)
+        
         return x_full
-

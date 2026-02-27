@@ -7,7 +7,7 @@
 
 ## Abstract
 
-This project presents a linear-scale attention Vision Transformer (L2ViT) for simultaneous binary classification and mass regression on multi-channel CMS calorimeter images. A ReLU kernel-based attention is used with $O(Nd^2)$ complexity and a Local Concentration Module (LCM) for local spatial reasoning. Two self-supervised pretraining strategies are explored on the 28 GB unlabelled CMS dataset: Masked Autoencoder (MAE) reconstruction and SimCLR contrastive learning with physics-aware augmentations. It is found that MAE pretraining degrades downstream performance due to the extreme sparsity of the data (98.8% zeros) and the architectural incompatibility between masking and LCM. SimCLR contrastive pretraining with detector-symmetry-preserving augmentations consistently improves all metrics over training from scratch.
+This project presents a linear-scale attention Vision Transformer (L2ViT) for simultaneous binary classification and mass regression on multi-channel CMS calorimeter images. A ReLU kernel-based attention is used with $O(Nd^2)$ complexity and a Local Concentration Module (LCM) for local spatial reasoning. Two self-supervised pretraining strategies are explored on the 28 GB unlabelled CMS dataset: Masked Autoencoder (MAE) reconstruction and SimCLR contrastive learning with physics-aware augmentations. It is found that MAE pretraining underperforms on this specific configuration, likely due to the extreme sparsity of the data (98.8% zeros) and the architectural constraints of masking with LCM. SimCLR contrastive pretraining with detector-symmetry-preserving augmentations consistently improves all metrics over training from scratch.
 
 **Links:** [ML4SCI Project Page](https://ml4sci.org/gsoc/2026/proposal_E2E5.html)
 
@@ -87,9 +87,9 @@ Two pretraining strategies were explored:
 | Objective | Reconstruct masked patches | Distinguish different collision events |
 | LCM during pretraining | Skipped (masked tokens break spatial grid) | Fully active |
 | Downstream Accuracy | 86.05% (worse than scratch) | **90.30%** (better than scratch) |
-| Conclusion | Ineffective on sparse data | Effective |
+| Conclusion | Underperforms in this regime | Effective |
 
-MAE pretraining failed for two reasons: (1) with 98.8% zero pixels, the reconstruction loss is dominated by trivially predicting background, and (2) masking requires `skip_lcm=True`, leaving LCM weights randomly initialized during finetuning.
+MAE pretraining underperformed in this empirical setup. Two factors are likely contributors: (1) with 98.8% zero pixels, the reconstruction loss may be dominated by trivially predicting background, and (2) masking requires `skip_lcm=True`, leaving LCM weights randomly initialized during finetuning. While MAE performance could potentially be improved through alternative masking strategies or energy-weighted loss formulations, SimCLR contrastive pretraining already delivers consistent gains in this setting.
 
 ### SimCLR Configuration
 
@@ -254,11 +254,11 @@ linearvit/
 
 The fundamental challenge with CMS calorimeter images is their extreme sparsity: 98.8% of pixels are zero. This has two consequences for pretraining strategy selection:
 
-1.  **Reconstruction objectives are trivially satisfied.** An MAE decoder that outputs zeros everywhere achieves very low reconstruction loss. The resulting backbone features are optimized for background prediction, not for discriminating collision signatures.
+1.  **Reconstruction objectives easily satisfied.** An MAE decoder that outputs zeros everywhere achieves relatively low reconstruction loss. The resulting backbone features may be optimized for background prediction rather than discriminating collision signatures.
 
-2.  **Masking is architecturally incompatible with LCM.** The Local Concentration Module uses spatially-structured depthwise convolutions that require a complete spatial grid. Masked tokens break this grid, forcing `skip_lcm=True` during MAE pretraining. LCM weights remain randomly initialized, corrupting pretrained features during finetuning.
+2.  **Masking constraints with LCM.** The Local Concentration Module uses spatially-structured depthwise convolutions that require a complete spatial grid. Because masked tokens break this grid in the current implementation, `skip_lcm=True` is forced during MAE pretraining. Consequently, LCM weights remain randomly initialized until finetuning.
 
-SimCLR avoids both issues: its contrastive objective forces the encoder to learn instance-discriminative features (directly relevant to classification), and it processes all tokens through the full backbone (including LCM) at every step. The physics-aware augmentations ensure that the learned invariances respect the symmetries of the CMS detector.
+While MAE could be tuned (e.g., via specialized masking ratios or energy-weighted loss) to mitigate these issues, SimCLR avoids both constraints naturally in this pipeline: its contrastive objective forces the encoder to learn instance-discriminative features, and it processes all tokens through the full backbone (including LCM) at every step. The physics-aware augmentations ensure that the learned invariances respect the symmetries of the CMS detector.
 
 ### Relation to Prior Work
 
@@ -302,4 +302,5 @@ The cyclic $\phi$-roll augmentation is motivated by the cylindrical geometry of 
   year={2022}
 }
 ```
+
 

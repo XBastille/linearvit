@@ -4,7 +4,8 @@ import torch
 from torch.utils.data import Dataset
 from sklearn.model_selection import train_test_split
 
-NORM_SCALE = 255.0
+NORM_SCALE = 1.0
+
 
 def inspect_h5(path):
     """Print the structure and shapes of an HDF5 file."""
@@ -16,7 +17,9 @@ def inspect_h5(path):
             if len(ds.shape) > 0 and ds.shape[0] > 0:
                 sample = ds[0]
                 if hasattr(sample, "shape"):
-                    print(f"    sample shape: {sample.shape}, min={np.min(sample):.4f}, max={np.max(sample):.4f}")
+                    print(
+                        f"    sample shape: {sample.shape}, min={np.min(sample):.4f}, max={np.max(sample):.4f}"
+                    )
                 else:
                     print(f"    sample value: {sample}")
 
@@ -30,13 +33,26 @@ def create_splits(labelled_path, seed=42, test_ratio=0.2, val_ratio=0.1):
     """
     with h5py.File(labelled_path, "r") as f:
         keys = list(f.keys())
+        img_key = None
+        for candidate in ["jet", "X", "images", "data", "x", "all_data", "X_jets"]:
+            if candidate in keys:
+                img_key = candidate
+                break
+        if img_key is None:
+            for k in keys:
+                if len(f[k].shape) >= 3:
+                    img_key = k
+                    break
+        if img_key is None:
+            img_key = keys[0]
+
         cls_key = None
         for candidate in ["Y", "y", "labels", "label", "class", "class_id", "target"]:
             if candidate in keys:
                 cls_key = candidate
                 break
 
-        n_samples = f[keys[0]].shape[0]
+        n_samples = f[img_key].shape[0]
 
         if cls_key is not None:
             labels = f[cls_key][:].flatten()
@@ -59,10 +75,15 @@ def create_splits(labelled_path, seed=42, test_ratio=0.2, val_ratio=0.1):
     relative_val = val_ratio / (1 - test_ratio)
 
     train_idx, val_idx = train_test_split(
-        trainval_idx, test_size=relative_val, stratify=trainval_labels, random_state=seed
+        trainval_idx,
+        test_size=relative_val,
+        stratify=trainval_labels,
+        random_state=seed,
     )
 
-    print(f"Splits -- train: {len(train_idx)}, val: {len(val_idx)}, test: {len(test_idx)}")
+    print(
+        f"Splits -- train: {len(train_idx)}, val: {len(val_idx)}, test: {len(test_idx)}"
+    )
     return {"train": train_idx, "val": val_idx, "test": test_idx}
 
 
@@ -89,6 +110,7 @@ def _augment_image(img):
     """
     if torch.rand(1).item() > 0.5:
         img = img.flip(-1)  # φ-flip (azimuthal symmetry)
+
     if torch.rand(1).item() > 0.5:
         img = img.flip(-2)  # η-flip (forward-backward symmetry)
     # Cyclic roll along φ-axis (W dimension)
@@ -156,7 +178,7 @@ class CMSUnlabelledDataset(Dataset):
             return noisy_img, img
 
         # For MAE pretraining: return (image,)
-        return img,
+        return (img,)
 
     def close(self):
         if self._file is not None:
@@ -191,7 +213,15 @@ class CMSLabelledDataset(Dataset):
                 self.img_key = keys[0]
 
             self.cls_key = None
-            for candidate in ["Y", "y", "labels", "label", "class", "class_id", "target"]:
+            for candidate in [
+                "Y",
+                "y",
+                "labels",
+                "label",
+                "class",
+                "class_id",
+                "target",
+            ]:
                 if candidate in keys:
                     self.cls_key = candidate
                     break
@@ -204,7 +234,9 @@ class CMSLabelledDataset(Dataset):
 
             if self.cls_key is None or self.mass_key is None:
                 print(f"[INFO] Available keys: {keys}")
-                print(f"[INFO] img_key={self.img_key}, cls_key={self.cls_key}, mass_key={self.mass_key}")
+                print(
+                    f"[INFO] img_key={self.img_key}, cls_key={self.cls_key}, mass_key={self.mass_key}"
+                )
                 for k in keys:
                     if k != self.img_key:
                         shape = f[k].shape
@@ -238,14 +270,18 @@ class CMSLabelledDataset(Dataset):
         # Class label (Y is shape (1,) so flatten)
         if self.cls_key is not None:
             val = self._file[self.cls_key][real_idx]
-            cls_label = int(val.flatten()[0]) if hasattr(val, 'flatten') else int(val)
+            cls_label = int(val.flatten()[0]) if hasattr(val, "flatten") else int(val)
         else:
             cls_label = 0
 
         # Mass label (m is shape (1,) so flatten)
         if self.mass_key is not None:
             val = self._file[self.mass_key][real_idx]
-            mass_label = float(val.flatten()[0]) if hasattr(val, 'flatten') else float(val)
+
+            mass_label = (
+                float(val.flatten()[0]) if hasattr(val, "flatten") else float(val)
+            )
+
         else:
             mass_label = 0.0
 
@@ -273,6 +309,7 @@ def _contrastive_augment(img):
     if shift > 0:
         img = torch.roll(img, shifts=shift, dims=-1)
 
+    # Channel dropout: randomly zero 1-2 channels (out of 8)
     C = img.shape[0]
     if C > 2:
         n_drop = torch.randint(1, min(3, C), (1,)).item()
@@ -343,4 +380,3 @@ class CMSContrastiveDataset(Dataset):
         if self._file is not None:
             self._file.close()
             self._file = None
-

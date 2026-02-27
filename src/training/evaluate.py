@@ -35,15 +35,17 @@ def print_comparison_table(pretrained_results, scratch_results):
 
     for label, key in metrics:
         pt_val = pretrained_results.get(key, "N/A") if pretrained_results else "N/A"
-        sc_val =  scratch_results.get(key, "N/A") if scratch_results else "N/A"
+        sc_val = scratch_results.get(key, "N/A") if scratch_results else "N/A"
 
         if isinstance(pt_val, float):
             pt_str = f"{pt_val:.6f}"
+
         else:
             pt_str = str(pt_val)
 
         if isinstance(sc_val, float):
             sc_str = f"{sc_val:.6f}"
+
         else:
             sc_str = str(sc_val)
 
@@ -57,7 +59,6 @@ def plot_training_curves(histories, save_dir="reports"):
     matplotlib.use("Agg")
 
     os.makedirs(save_dir, exist_ok=True)
-
     fig, axes = plt.subplots(1, 3, figsize=(18, 5))
 
     for label, hist in histories.items():
@@ -66,10 +67,8 @@ def plot_training_curves(histories, save_dir="reports"):
         epochs = range(1, len(hist["train_loss"]) + 1)
         axes[0].plot(epochs, hist["train_loss"], label=f"{label} (train)")
         axes[0].plot(epochs, hist["val_loss"], "--", label=f"{label} (val)")
-
         axes[1].plot(epochs, hist["train_acc"], label=f"{label} (train)")
         axes[1].plot(epochs, hist["val_acc"], "--", label=f"{label} (val)")
-
         axes[2].plot(epochs, hist["train_mae"], label=f"{label} (train)")
         axes[2].plot(epochs, hist["val_mae"], "--", label=f"{label} (val)")
 
@@ -77,17 +76,14 @@ def plot_training_curves(histories, save_dir="reports"):
     axes[0].set_xlabel("Epoch")
     axes[0].legend()
     axes[0].grid(True, alpha=0.3)
-
     axes[1].set_title("Classification Accuracy")
     axes[1].set_xlabel("Epoch")
     axes[1].legend()
     axes[1].grid(True, alpha=0.3)
-
     axes[2].set_title("Mass MAE")
     axes[2].set_xlabel("Epoch")
     axes[2].legend()
     axes[2].grid(True, alpha=0.3)
-
     plt.tight_layout()
     path = os.path.join(save_dir, "training_curves.png")
     plt.savefig(path, dpi=150)
@@ -118,8 +114,10 @@ def plot_mass_scatter(mass_true, mass_pred, title, save_path):
     fig, ax = plt.subplots(figsize=(7, 7))
     ax.scatter(mass_true, mass_pred, alpha=0.3, s=5)
 
-    lims = [min(mass_true.min(), mass_pred.min()),
-            max(mass_true.max(), mass_pred.max())]
+    lims = [
+        min(mass_true.min(), mass_pred.min()),
+        max(mass_true.max(), mass_pred.max()),
+    ]
 
     ax.plot(lims, lims, "r--", linewidth=1, label="Ideal")
     ax.set_xlabel("True Mass")
@@ -194,14 +192,17 @@ def run_evaluation():
             continue
 
         plot_confusion_matrix(
-            results["labels"], results["preds"], num_classes,
+            results["labels"],
+            results["preds"],
+            num_classes,
             f"Confusion Matrix ({tag})",
-            f"reports/confusion_matrix_{tag}.png"
+            f"reports/confusion_matrix_{tag}.png",
         )
         plot_mass_scatter(
-            results["mass_true"], results["mass_pred"],
+            results["mass_true"],
+            results["mass_pred"],
             f"Predicted vs True Mass ({tag})",
-            f"reports/mass_scatter_{tag}.png"
+            f"reports/mass_scatter_{tag}.png",
         )
 
         # ROC-AUC plot (binary classification)
@@ -211,9 +212,10 @@ def run_evaluation():
             else:
                 probs_array = np.array(results["preds"])
             auc_val = plot_auc(
-                results["labels"], probs_array,
+                results["labels"],
+                probs_array,
                 f"ROC Curve ({tag})",
-                f"reports/roc_auc_{tag}.png"
+                f"reports/roc_auc_{tag}.png",
             )
             if auc_val is not None:
                 print(f"  {tag} AUC: {auc_val:.4f}")

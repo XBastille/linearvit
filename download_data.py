@@ -30,25 +30,38 @@ def download_file(url, dest_path, chunk_size=8192, quiet=False):
 
     response = requests.get(url, stream=True, timeout=30)
     response.raise_for_status()
-
     total_size = int(response.headers.get("content-length", 0))
     os.makedirs(os.path.dirname(dest_path), exist_ok=True)
-
     tmp_path = dest_path + ".tmp"
+
     with open(tmp_path, "wb") as f:
         if quiet:
-            print(f"Downloading {os.path.basename(dest_path)} ({total_size / 1024**3:.2f} GB) silently. This may take a while...")
+            print(
+                f"Downloading {os.path.basename(dest_path)} ({total_size / 1024**3:.2f} GB) silently. This may take a while..."
+            )
+
             downloaded = 0
             last_printed = 0
+
             for chunk in response.iter_content(chunk_size=chunk_size):
                 if chunk:
                     f.write(chunk)
                     downloaded += len(chunk)
                     if downloaded - last_printed >= 1024**3:
-                        print(f"  ... downloaded {downloaded / 1024**3:.1f} GB / {total_size / 1024**3:.2f} GB")
+                        print(
+                            f"  ... downloaded {downloaded / 1024**3:.1f} GB / {total_size / 1024**3:.2f} GB"
+                        )
+
                         last_printed = downloaded
+                        
         else:
-            with tqdm(total=total_size, unit="B", unit_scale=True, desc=os.path.basename(dest_path), mininterval=2.0) as pbar:
+            with tqdm(
+                total=total_size,
+                unit="B",
+                unit_scale=True,
+                desc=os.path.basename(dest_path),
+                mininterval=2.0,
+            ) as pbar:
                 for chunk in response.iter_content(chunk_size=chunk_size):
                     if chunk:
                         f.write(chunk)
@@ -60,11 +73,27 @@ def download_file(url, dest_path, chunk_size=8192, quiet=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Download CMS E2E datasets")
-    parser.add_argument("--labelled-only", action="store_true", help="Download only the labelled dataset")
-    parser.add_argument("--unlabelled-only", action="store_true", help="Download only the unlabelled dataset")
-    parser.add_argument("--dry-run", action="store_true", help="Print download info without downloading")
-    parser.add_argument("--data-dir", type=str, default=DATA_DIR, help="Target directory for datasets")
-    parser.add_argument("--quiet", action="store_true", help="Minimal output to prevent terminal from crashing")
+    parser.add_argument(
+        "--labelled-only",
+        action="store_true",
+        help="Download only the labelled dataset",
+    )
+    parser.add_argument(
+        "--unlabelled-only",
+        action="store_true",
+        help="Download only the unlabelled dataset",
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print download info without downloading"
+    )
+    parser.add_argument(
+        "--data-dir", type=str, default=DATA_DIR, help="Target directory for datasets"
+    )
+    parser.add_argument(
+        "--quiet",
+        action="store_true",
+        help="Minimal output to prevent terminal from crashing",
+    )
     args = parser.parse_args()
 
     targets = []
