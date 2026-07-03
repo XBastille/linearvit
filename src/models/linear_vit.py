@@ -313,7 +313,6 @@ class LinearViT(nn.Module):
             tokens, dim=1, index=ids_keep.unsqueeze(-1).expand(-1, -1, D)
         )  # (B, N_vis, D)
 
-        # Create mask: True = masked, False = visible
         mask = torch.ones(B, N, device=tokens.device, dtype=torch.bool)
         mask.scatter_(1, ids_keep, False)
 

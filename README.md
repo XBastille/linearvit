@@ -1,13 +1,13 @@
 # Linear Attention Vision Transformer for End-to-End Mass Regression and Classification
 
-> **ML4SCI GSoC 2026 — Specific Task 2h**
+> **ML4SCI GSoC 2026, Specific Task 2h**
 > CMS End-to-End Deep Learning Project
 
 ---
 
 ## Abstract
 
-This project presents a linear-scale attention Vision Transformer (L2ViT) for simultaneous binary classification and mass regression on multi-channel CMS calorimeter images. A ReLU kernel-based attention is used with $O(Nd^2)$ complexity and a Local Concentration Module (LCM) for local spatial reasoning. Two self-supervised pretraining strategies are explored on the 28 GB unlabelled CMS dataset: Masked Autoencoder (MAE) reconstruction and SimCLR contrastive learning with physics-aware augmentations. It is found that MAE pretraining underperforms on this specific configuration, likely due to the extreme sparsity of the data (98.8% zeros) and the architectural constraints of masking with LCM. SimCLR contrastive pretraining with detector-symmetry-preserving augmentations consistently improves all metrics over training from scratch.
+This project presents a linear-scale attention Vision Transformer (L2ViT) for simultaneous binary classification and mass regression on multi-channel CMS calorimeter images. The model replaces softmax attention with a ReLU kernel formulation of $O(Nd^2)$ complexity and adds a Local Concentration Module (LCM) for local spatial reasoning. Two self-supervised pretraining strategies are compared on the 28 GB unlabelled CMS dataset: Masked Autoencoder (MAE) reconstruction and SimCLR contrastive learning with physics-aware augmentations. MAE underperforms in this configuration, likely because of the extreme sparsity of the data (98.8% zeros) and the constraint that masking imposes on the LCM. SimCLR, with detector-symmetry-preserving augmentations, consistently improves every metric over training from scratch.
 
 **Links:** [ML4SCI Project Page](https://ml4sci.org/gsoc/2026/proposal_E2E5.html)
 
